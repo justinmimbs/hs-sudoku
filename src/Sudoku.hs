@@ -1,6 +1,7 @@
 module Sudoku
     where
 
+import Data.List (unlines, unwords, intercalate)
 import Data.Map (Map)
 import Data.Set (Set)
 import Flow
@@ -18,16 +19,7 @@ cross as bs =
     [ pair a b | a <- as, b <- bs ]
 
 
-groupsOf :: Int -> [ a ] -> [ [ a ] ]
-groupsOf n list =
-    case splitAt n list of
-        ( [], _ ) ->
-            []
-        ( group, rest ) ->
-            group : groupsOf n rest
-
-
---
+-- squares, units, peers
 
 digits :: [ Char ]
 digits =
@@ -42,8 +34,10 @@ letters =
 type Square =
     [ Char ]
 
+
 type Unit =
     [ Square ]
+
 
 squares :: [ Square ]
 squares =
@@ -55,7 +49,7 @@ unitsAll =
     concat
         [ [ cross [a] digits | a <- letters ]
         , [ cross letters [b] | b <- digits ]
-        , [ cross a b | a <- groupsOf 3 letters, b <- groupsOf 3 digits ]
+        , [ cross as bs | as <- groupsOf 3 letters, bs <- groupsOf 3 digits ]
         ]
 
 
@@ -78,16 +72,10 @@ peersBySquare =
             )
 
 
---
-
-ex :: String
-ex =
-    "4.....8.5.3..........7......2.....6.....8.4......1.......6.3.7.5..2.....1.4......"
-
+-- Values
 
 type Values =
     Map Square [ Char ]
-  --Map Square (Set Char)
 
 
 valuesFromString :: String -> Maybe Values
@@ -95,6 +83,7 @@ valuesFromString string =
     let
         blanks =
             ".0"
+
         chars =
             string |> filter (\c -> elem c (blanks ++ digits))
     in
@@ -106,3 +95,37 @@ valuesFromString string =
                 |> Just
         else
             Nothing
+
+
+valuesToString :: Values -> String
+valuesToString values =
+    let
+        list =
+            Map.elems values
+
+        len =
+            list |> map length |> maximum
+    in
+        list
+            |> map (padLeft len ' ')
+            |> groupsOf 9
+            |> map (groupsOf 3 .> map unwords .> intercalate " | ")
+            |> groupsOf 3
+            |> intercalate [ replicate 3 (replicate (len * 3 + 2) '-') |> intercalate "-+-" ]
+            |> unlines
+
+
+-- utilities
+
+groupsOf :: Int -> [ a ] -> [ [ a ] ]
+groupsOf n list =
+    case splitAt n list of
+        ( [], _ ) ->
+            []
+        ( group, rest ) ->
+            group : groupsOf n rest
+
+
+padLeft :: Int -> a -> [ a ] -> [ a ]
+padLeft n x list =
+    replicate (max 0 (n - length list)) x ++ list
