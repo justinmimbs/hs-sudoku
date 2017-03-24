@@ -1,6 +1,6 @@
 module Main where
 
-import Sudoku
+import qualified Sudoku
 
 
 example1 :: [ Char ]
@@ -15,4 +15,4 @@ example2 =
 
 main :: IO ()
 main =
-    putStrLn (maybe "bad values" valuesToString (valuesFromString example2 >>= valuesSearch))
+    putStrLn (maybe "bad values" Sudoku.toString (Sudoku.fromString example2 >>= Sudoku.search))

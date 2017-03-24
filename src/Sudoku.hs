@@ -1,4 +1,9 @@
 module Sudoku
+    ( Values
+    , fromString
+    , toString
+    , search
+    )
     where
 
 import Control.Monad (foldM, (>=>))
@@ -59,9 +64,7 @@ unitsBySquare :: Map Square [ Unit ]
 unitsBySquare =
     squares
         |> map
-            (\s ->
-                ( s, unitsAll |> filter (elem s))
-            )
+            (\s -> ( s, unitsAll |> filter (elem s) ))
         |> Map.fromList
 
 
@@ -69,9 +72,7 @@ peersBySquare :: Map Square (Set Square)
 peersBySquare =
     unitsBySquare
         |> Map.mapWithKey
-            (\s units->
-                concat units |> Set.fromList |> Set.delete s
-            )
+            (\s units-> concat units |> Set.fromList |> Set.delete s)
 
 
 -- Values
@@ -80,8 +81,8 @@ type Values =
     Map Square [ Char ]
 
 
-valuesToString :: Values -> String
-valuesToString values =
+toString :: Values -> String
+toString values =
     let
         list =
             Map.elems values
@@ -98,8 +99,8 @@ valuesToString values =
             |> unlines
 
 
-valuesFromString :: String -> Maybe Values
-valuesFromString string =
+fromString :: String -> Maybe Values
+fromString string =
     let
         blanks =
             ".0"
@@ -112,56 +113,69 @@ valuesFromString string =
                 |> zip squares
                 |> filter (\( _, char ) -> not (elem char blanks))
                 |> foldM
-                    (\values ( square, d ) -> valuesAssign square d values)
-                    valuesEmpty
+                    (\values ( square, d ) -> assign square d values)
+                    empty
         else
             Nothing
 
 
-valuesEmpty :: Values
-valuesEmpty =
+empty :: Values
+empty =
     replicate (length squares) digits
         |> zip squares
         |> Map.fromList
 
 
-valuesAssign :: Square -> Char -> Values -> Maybe Values
-valuesAssign square d values =
+{-
+Eliminate all the other values (except d) from square and propagate.
+-}
+assign :: Square -> Char -> Values -> Maybe Values
+assign square d values =
     Map.lookup square values
         |> maybe [] (filter (/= d))
-        |> foldM (flip (valuesEliminate square)) values
+        |> foldM (flip (eliminate square)) values
 
 
-valuesEliminate :: Square -> Char -> Values -> Maybe Values
-valuesEliminate square x values =
+{-
+Eliminate x from square. Propagate when square then contains only one value,
+and also when x can only be placed in one other square. Return Nothing if a
+contradiction is detected.
+-}
+eliminate :: Square -> Char -> Values -> Maybe Values
+eliminate square x values =
     if not (elem x (values ! square)) then
+        -- Already eliminated
         Just values
     else
         case values ! square |> filter (/= x) of
+            -- Contradiction: removed last value
             [] ->
                 Nothing
 
             value@(d : ds) ->
                 values
                     |> Map.insert square value
+                    -- (1) If square is reduced to one value d, then eliminate d from its peers.
                     |> (if ds == [] then
                             (\values ->
                                 peersBySquare ! square
-                                    |> foldM (\v s -> valuesEliminate s d v) values
+                                    |> foldM (\v s -> eliminate s d v) values
                             )
                         else
                             Just
                        )
+                    -- (2) If a unit is reduced to only one square for the value x, then put it there.
                     >=> (\values ->
                             unitsBySquare ! square
                                 |> foldM
                                     (\v unit ->
                                         case unit |> filter (\s -> elem x (v ! s)) of
+                                            -- Contradiction: no place for this value
                                             [] ->
                                                 Nothing
 
                                             s : [] ->
-                                                v |> valuesAssign s x
+                                                v |> assign s x
 
                                             _ ->
                                                 Just v
@@ -176,20 +190,23 @@ isSolved =
     Map.elems .> all (length .> (== 1))
 
 
-valuesSearch :: Values -> Maybe Values
-valuesSearch values =
+{-
+Using depth-first search and propagation, try all possible values.
+-}
+search :: Values -> Maybe Values
+search values =
     if values |> isSolved then
         Just values
     else
         let
-            -- variable ordering: choose square having the _minimum remaining values_
-            ( _, square, ds ) =
+            -- Variable ordering: choose square having the _minimum remaining values_.
+            ( _, square, value ) =
                 values |> Map.filter (length .> (> 1)) |> Map.toList |> map (\( s, v ) -> ( length v, s, v )) |> minimum
         in
-            -- value ordering: no special order; choose d in order of ds
-            ds
+            -- Value ordering: no special order; choose d in given order.
+            value
                 |> mapMaybe
-                    (\d -> valuesAssign square d values >>= valuesSearch)
+                    (\d -> assign square d values >>= search)
                 |> listToMaybe
 
 
