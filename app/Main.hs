@@ -1,5 +1,7 @@
 module Main where
 
+import Control.Monad ((>=>))
+import Flow
 import qualified Sudoku
 
 
@@ -15,4 +17,7 @@ example2 =
 
 main :: IO ()
 main =
-    putStrLn (maybe "bad values" Sudoku.toString (Sudoku.fromString example2 >>= Sudoku.search))
+    example2
+        |> Sudoku.parseGrid >=> Sudoku.solve
+        |> maybe "bad values" show
+        |> putStrLn

@@ -18,5 +18,6 @@ executable sudoku
   main-is:             Main.hs
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
+                     , flow == 1.0.7
                      , sudoku
   default-language:    Haskell2010

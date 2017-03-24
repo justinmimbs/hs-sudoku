@@ -1,8 +1,7 @@
 module Sudoku
-    ( Values
-    , fromString
-    , toString
-    , search
+    ( Grid
+    , parseGrid
+    , solve
     )
     where
 
@@ -224,3 +223,25 @@ groupsOf n list =
 padLeft :: Int -> a -> [ a ] -> [ a ]
 padLeft n x list =
     replicate (max 0 (n - length list)) x ++ list
+
+
+-- exposed
+
+newtype Grid =
+    Grid Values
+    deriving (Eq)
+
+
+instance Show Grid where
+    show (Grid values) =
+        toString values
+
+
+parseGrid :: String -> Maybe Grid
+parseGrid =
+    fromString .> fmap Grid
+
+
+solve :: Grid -> Maybe Grid
+solve (Grid values) =
+    search values |> fmap Grid
