@@ -4,7 +4,7 @@ module Sudoku
 import Control.Monad (foldM, (>=>))
 import Data.List (unlines, unwords, intercalate)
 import Data.Map (Map, (!))
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, mapMaybe, listToMaybe)
 import Data.Set (Set)
 import Flow
 import qualified Data.Map as Map
@@ -169,6 +169,28 @@ valuesEliminate square x values =
                                     )
                                     values
                         )
+
+
+isSolved :: Values -> Bool
+isSolved =
+    Map.elems .> all (length .> (== 1))
+
+
+valuesSearch :: Values -> Maybe Values
+valuesSearch values =
+    if values |> isSolved then
+        Just values
+    else
+        let
+            -- variable ordering: choose square having the _minimum remaining values_
+            ( _, square, ds ) =
+                values |> Map.filter (length .> (> 1)) |> Map.toList |> map (\( s, v ) -> ( length v, s, v )) |> minimum
+        in
+            -- value ordering: no special order; choose d in order of ds
+            ds
+                |> mapMaybe
+                    (\d -> valuesAssign square d values >>= valuesSearch)
+                |> listToMaybe
 
 
 -- utilities

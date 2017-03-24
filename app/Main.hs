@@ -15,4 +15,4 @@ example2 =
 
 main :: IO ()
 main =
-    putStrLn (maybe "bad values" valuesToString (valuesFromString example2))
+    putStrLn (maybe "bad values" valuesToString (valuesFromString example2 >>= valuesSearch))
