@@ -2,6 +2,7 @@ module Sudoku
     ( Grid
     , parseGrid
     , solve
+    , values
     )
     where
 
@@ -130,8 +131,8 @@ Eliminate all the other values (except d) from square and propagate.
 -}
 assign :: Square -> Char -> Values -> Maybe Values
 assign square d values =
-    Map.lookup square values
-        |> maybe [] (filter (/= d))
+    values ! square
+        |> filter (/= d)
         |> foldM (flip (eliminate square)) values
 
 
@@ -245,3 +246,8 @@ parseGrid =
 solve :: Grid -> Maybe Grid
 solve (Grid values) =
     search values |> fmap Grid
+
+
+values :: Grid -> Map String String
+values (Grid values) =
+    values
