@@ -6,8 +6,9 @@ module Sudoku
     )
     where
 
-import Control.Monad (foldM, (>=>))
-import Data.List (unlines, unwords, intercalate)
+import Control.Monad (foldM, liftM2, (>=>))
+import Data.Function (on)
+import Data.List (unlines, unwords, intercalate, minimumBy)
 import Data.Map (Map, (!))
 import Data.Maybe (fromMaybe, mapMaybe, listToMaybe)
 import Data.Set (Set)
@@ -16,17 +17,15 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 
-pair :: a -> a -> [ a ]
-pair a b =
-    [ a, b ]
-
-
-cross :: [ a ] -> [ a ] -> [ [ a ] ]
-cross as bs =
-    [ pair a b | a <- as, b <- bs ]
-
-
 -- squares, units, peers
+
+type Square =
+    [ Char ]
+
+
+type Unit =
+    [ Square ]
+
 
 digits :: [ Char ]
 digits =
@@ -38,25 +37,17 @@ letters =
     "ABCDEFGHI"
 
 
-type Square =
-    [ Char ]
-
-
-type Unit =
-    [ Square ]
-
-
 squares :: [ Square ]
 squares =
-    cross letters digits
+    cartesianProduct letters digits
 
 
 unitsAll :: [ Unit ]
 unitsAll =
     concat
-        [ [ cross [a] digits | a <- letters ]
-        , [ cross letters [b] | b <- digits ]
-        , [ cross as bs | as <- groupsOf 3 letters, bs <- groupsOf 3 digits ]
+        [ [ cartesianProduct [ l ] digits | l <- letters ]
+        , [ cartesianProduct letters [ d ] | d <- digits ]
+        , [ cartesianProduct l3 d3 | l3 <- groupsOf 3 letters, d3 <- groupsOf 3 digits ]
         ]
 
 
@@ -75,7 +66,7 @@ peersBySquare =
             (\s units-> concat units |> Set.fromList |> Set.delete s)
 
 
--- Values
+-- Values (maps each square to a list of its possible values)
 
 type Values =
     Map Square [ Char ]
@@ -185,9 +176,9 @@ eliminate square x values =
                         )
 
 
-isSolved :: Values -> Bool
-isSolved =
-    Map.elems .> all (length .> (== 1))
+unsolved :: Values -> [ ( Square, [ Char ] ) ]
+unsolved =
+    Map.toList .> filter (snd .> length .> (> 1))
 
 
 {-
@@ -195,28 +186,36 @@ Using depth-first search and propagation, try all possible values.
 -}
 search :: Values -> Maybe Values
 search values =
-    if values |> isSolved then
-        Just values
-    else
-        let
-            -- Variable ordering: choose square having the _minimum remaining values_.
-            ( _, square, value ) =
-                values |> Map.filter (length .> (> 1)) |> Map.toList |> map (\( s, v ) -> ( length v, s, v )) |> minimum
-        in
-            -- Value ordering: no special order; choose d in given order.
-            value
-                |> mapMaybe
-                    (\d -> assign square d values >>= search)
-                |> listToMaybe
+    case unsolved values of
+        [] ->
+            Just values
+
+        list ->
+            let
+                -- Variable ordering: choose unsolved square having the _minimum remaining values_.
+                ( square, value ) =
+                    list |> minimumBy (compare `on` (snd .> length))
+            in
+                -- Value ordering: no special order; choose d in given order.
+                value
+                    |> mapMaybe
+                        (\d -> assign square d values >>= search)
+                    |> listToMaybe
 
 
 -- utilities
+
+cartesianProduct :: [ a ] -> [ a ] -> [ [ a ] ]
+cartesianProduct =
+    liftM2 (\x y -> [ x, y ])
+
 
 groupsOf :: Int -> [ a ] -> [ [ a ] ]
 groupsOf n list =
     case splitAt n list of
         ( [], _ ) ->
             []
+
         ( group, rest ) ->
             group : groupsOf n rest
 
